@@ -1,5 +1,5 @@
 # Core dependencies
-Flask==2.2.2                     # Web framework for building the API
+Flask==2.2.5                     # Web framework for building the API
 web3==5.29.0                     # Ethereum library for Python
 py-solc-x==1.0.0                 # Solidity compiler for Python
 eth-keys==0.3.3                  # Ethereum key management
