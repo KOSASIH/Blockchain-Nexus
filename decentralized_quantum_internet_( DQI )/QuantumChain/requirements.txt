@@ -11,7 +11,7 @@ pytest==7.1.2
 cryptography==36.0.1
 
 # Requests for making HTTP requests (if needed)
-requests==2.26.0
+requests==2.32.2
 
 # Flask-SocketIO for real-time communication (if needed)
 flask-socketio==5.1.1
