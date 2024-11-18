@@ -17,4 +17,4 @@ requests==2.26.0
 flask-socketio==5.1.1
 
 # Flask-CORS for handling Cross-Origin Resource Sharing (if needed)
-flask-cors==3.0.10
+flask-cors==4.0.2
