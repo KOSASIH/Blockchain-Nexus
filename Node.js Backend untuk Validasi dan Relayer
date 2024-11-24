@@ -1,0 +1,46 @@
+const Web3 = require('web3');
+const axios = require('axios');
+
+// Configurations
+const sourceRpc = "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"; // Ethereum
+const targetRpc = "https://bsc-dataseed.binance.org/"; // BSC
+const adminPrivateKey = "YOUR_ADMIN_PRIVATE_KEY";
+
+const sourceWeb3 = new Web3(sourceRpc);
+const targetWeb3 = new Web3(targetRpc);
+
+const sourceBridgeContract = new sourceWeb3.eth.Contract(
+    require('./SourceBridgeABI.json'),
+    "SOURCE_CONTRACT_ADDRESS"
+);
+const targetBridgeContract = new targetWeb3.eth.Contract(
+    require('./TargetBridgeABI.json'),
+    "TARGET_CONTRACT_ADDRESS"
+);
+
+// Monitor and Relay
+async function monitorAndRelay() {
+    sourceBridgeContract.events.TokenLocked({ fromBlock: "latest" })
+        .on("data", async (event) => {
+            const { sender, amount, targetChain, targetAddress } = event.returnValues;
+
+            if (targetChain === "BSC") {
+                const txHash = Web3.utils.soliditySha3(sender, amount, targetChain, targetAddress, event.blockNumber);
+                const signedTx = await targetWeb3.eth.accounts.signTransaction(
+                    {
+                        to: targetBridgeContract.options.address,
+                        gas: 2000000,
+                        data: targetBridgeContract.methods.releaseTokens(targetAddress, amount, "Ethereum", txHash).encodeABI()
+                    },
+                    adminPrivateKey
+                );
+
+                const receipt = await targetWeb3.eth.sendSignedTransaction(signedTx.rawTransaction);
+                console.log("Token Released on BSC:", receipt.transactionHash);
+            }
+        })
+        .on("error", console.error);
+}
+
+// Start Monitoring
+monitorAndRelay();
