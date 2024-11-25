@@ -1,0 +1,61 @@
+import React, { useState } from 'react';
+import axios from 'axios';
+import Web3 from 'web3';
+
+const App = () => {
+    const [userId, setUserId] = useState('');
+    const [wallet, setWallet] = useState(null);
+    const [transaction, setTransaction] = useState({ to: '', amount: '' });
+
+    const createWallet = async () => {
+        const { data } = await axios.post('/wallet/create', { userId });
+        setWallet(data.wallets);
+    };
+
+    const sendTransaction = async () => {
+        const { data } = await axios.post('/transaction/send', {
+            userId,
+            blockchain: 'ethereum', // or 'bitcoin'
+            to: transaction.to,
+            amount: transaction.amount,
+        });
+        alert(`Transaction Successful: ${data.receipt.transactionHash}`);
+    };
+
+    return (
+        <div>
+            <h1>Multi-Platform Wallet</h1>
+            <input
+                type="text"
+                placeholder="User ID"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+            />
+            <button onClick={createWallet}>Create Wallet</button>
+
+            {wallet && (
+                <div>
+                    <h2>Your Wallet</h2>
+                    <pre>{JSON.stringify(wallet, null, 2)}</pre>
+                </div>
+            )}
+
+            <h2>Send Transaction</h2>
+            <input
+                type="text"
+                placeholder="Recipient Address"
+                value={transaction.to}
+                onChange={(e) => setTransaction({ ...transaction, to: e.target.value })}
+            />
+            <input
+                type="text"
+                placeholder="Amount (ETH)"
+                value={transaction.amount}
+                onChange={(e) => setTransaction({ ...transaction, amount: e.target.value })}
+            />
+            <button onClick={sendTransaction}>Send</button>
+        </div>
+    );
+};
+
+export default App;

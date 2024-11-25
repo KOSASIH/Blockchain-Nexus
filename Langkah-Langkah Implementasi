@@ -1,0 +1,16 @@
+1. Instalasi Paket:
+
+npm install express body-parser ethers jsonwebtoken swagger-ui-express swagger-jsdoc
+
+
+2. Konfigurasi Blockchain: Tambahkan API node untuk Ethereum, Binance Smart Chain, dan Polygon.
+
+
+3. Pengujian API: Jalankan server:
+
+node index.js
+
+Buka dokumentasi API di:
+
+http://localhost:4000/api-docs
+

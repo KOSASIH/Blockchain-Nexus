@@ -1,0 +1,178 @@
+const express = require('express');
+const bodyParser = require('body-parser');
+const { v4: uuidv4 } = require('uuid');
+const { Ed25519KeyPair } = require('@transmute/did-key-ed25519');
+const { Resolver } = require('did-resolver');
+const { getResolver } = require('ethr-did-resolver');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+
+const app = express();
+const port = 5000;
+const JWT_SECRET = 'super_secure_secret';
+
+// MongoDB Connection
+mongoose.connect('mongodb://localhost:27017/did-management', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+// DID Schema
+const DIDSchema = new mongoose.Schema({
+  id: String,
+  did: String,
+  publicKey: String,
+  privateKey: String,
+  metadata: Object,
+});
+const DIDModel = mongoose.model('DID', DIDSchema);
+
+app.use(bodyParser.json());
+
+// Resolver Configuration
+const providerConfig = {
+  networks: [
+    {
+      name: 'mainnet',
+      rpcUrl: 'https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID',
+    },
+  ],
+};
+const didResolver = new Resolver(getResolver(providerConfig));
+
+// Utility Functions
+const generateDID = async () => {
+  const keyPair = await Ed25519KeyPair.generate();
+  const didDocument = {
+    id: `did:key:${keyPair.controller}`,
+    publicKey: keyPair.publicKeyMultibase,
+    authentication: [
+      {
+        id: `did:key:${keyPair.controller}#${keyPair.publicKeyMultibase}`,
+        type: 'Ed25519VerificationKey2020',
+        publicKeyMultibase: keyPair.publicKeyMultibase,
+        controller: `did:key:${keyPair.controller}`,
+      },
+    ],
+  };
+  return { didDocument, keyPair };
+};
+
+// Routes
+
+/**
+ * @swagger
+ * /did/create:
+ *   post:
+ *     summary: Generate a new DID
+ *     responses:
+ *       200:
+ *         description: DID created successfully
+ */
+app.post('/did/create', async (req, res) => {
+  try {
+    const { didDocument, keyPair } = await generateDID();
+    const newDID = new DIDModel({
+      id: uuidv4(),
+      did: didDocument.id,
+      publicKey: keyPair.publicKeyMultibase,
+      privateKey: keyPair.privateKeyMultibase,
+      metadata: req.body.metadata || {},
+    });
+    await newDID.save();
+    res.json({ did: didDocument.id, publicKey: keyPair.publicKeyMultibase });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /did/resolve:
+ *   get:
+ *     summary: Resolve a DID
+ *     parameters:
+ *       - name: did
+ *         in: query
+ *         required: true
+ *         description: DID to resolve
+ *     responses:
+ *       200:
+ *         description: Resolved DID document
+ */
+app.get('/did/resolve', async (req, res) => {
+  try {
+    const { did } = req.query;
+    const resolved = await didResolver.resolve(did);
+    res.json(resolved);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /did/authenticate:
+ *   post:
+ *     summary: Authenticate a DID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               did:
+ *                 type: string
+ *               challenge:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Authentication successful
+ */
+app.post('/did/authenticate', async (req, res) => {
+  try {
+    const { did, challenge } = req.body;
+    const didData = await DIDModel.findOne({ did });
+    if (!didData) return res.status(404).json({ error: 'DID not found' });
+
+    // Sign JWT as proof of authentication
+    const token = jwt.sign({ did, challenge }, JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /did/verify:
+ *   post:
+ *     summary: Verify a JWT token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Verification successful
+ */
+app.post('/did/verify', (req, res) => {
+  try {
+    const { token } = req.body;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    res.json({ verified: true, data: decoded });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Server
+app.listen(port, () => {
+  console.log(`DID Management Service running on http://localhost:${port}`);
+});

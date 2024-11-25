@@ -1,0 +1,84 @@
+const express = require('express');
+const bodyParser = require('body-parser');
+const crypto = require('crypto');
+const Web3 = require('web3');
+const bip39 = require('bip39');
+const hdkey = require('ethereumjs-wallet/hdkey');
+const bitcoin = require('bitcoinjs-lib');
+
+const app = express();
+const port = 3000;
+
+app.use(bodyParser.json());
+
+// Blockchain Configurations
+const web3 = new Web3("https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID");
+
+// In-memory storage for demo purposes
+let wallets = {}; // Example: { userId: { address: '0x...', privateKey: '...' }}
+
+// Utility Functions
+function generateEthereumWallet(mnemonic) {
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const hdWallet = hdkey.fromMasterSeed(seed);
+    const key = hdWallet.derivePath("m/44'/60'/0'/0/0").getWallet();
+    const address = `0x${key.getAddress().toString('hex')}`;
+    const privateKey = key.getPrivateKey().toString('hex');
+    return { address, privateKey };
+}
+
+function generateBitcoinWallet(mnemonic) {
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const root = bitcoin.bip32.fromSeed(seed);
+    const child = root.derivePath("m/44'/0'/0'/0/0");
+    const { address } = bitcoin.payments.p2pkh({ pubkey: child.publicKey });
+    const privateKey = child.toWIF();
+    return { address, privateKey };
+}
+
+// API Endpoints
+app.post('/wallet/create', (req, res) => {
+    const { userId } = req.body;
+    const mnemonic = bip39.generateMnemonic();
+    const ethWallet = generateEthereumWallet(mnemonic);
+    const btcWallet = generateBitcoinWallet(mnemonic);
+
+    wallets[userId] = { mnemonic, ethereum: ethWallet, bitcoin: btcWallet };
+    res.json({ message: 'Wallet created', wallets: wallets[userId] });
+});
+
+app.get('/wallet/:userId', (req, res) => {
+    const userId = req.params.userId;
+    if (!wallets[userId]) {
+        return res.status(404).json({ message: 'Wallet not found' });
+    }
+    res.json(wallets[userId]);
+});
+
+app.post('/transaction/send', async (req, res) => {
+    const { userId, blockchain, to, amount } = req.body;
+    const userWallet = wallets[userId]?.[blockchain];
+    if (!userWallet) {
+        return res.status(404).json({ message: 'Wallet not found' });
+    }
+
+    if (blockchain === 'ethereum') {
+        const signedTx = await web3.eth.accounts.signTransaction(
+            {
+                to,
+                value: web3.utils.toWei(amount, 'ether'),
+                gas: 21000,
+            },
+            userWallet.privateKey
+        );
+        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        return res.json({ message: 'Transaction successful', receipt });
+    }
+
+    // Implement Bitcoin Transaction Logic here (similar to Ethereum)
+    res.json({ message: 'Transaction feature for Bitcoin is under development' });
+});
+
+app.listen(port, () => {
+    console.log(`Wallet backend running on http://localhost:${port}`);
+});
