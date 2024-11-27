@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract StateChannel {
+    address public participantA;
+    address public participantB;
+    uint256 public depositA;
+    uint256 public depositB;
+    bool public channelOpen;
+    
+    mapping(address => uint256) public balances;
+
+    // Events
+    event ChannelOpened(address indexed participantA, address indexed participantB);
+    event Deposit(address indexed participant, uint256 amount);
+    event ChannelClosed(address indexed closer, uint256 finalBalanceA, uint256 finalBalanceB);
+
+    constructor(address _participantB) payable {
+        participantA = msg.sender;
+        participantB = _participantB;
+        channelOpen = false;
+    }
+
+    // Open the channel
+    function openChannel() external payable {
+        require(!channelOpen, "Channel is already open");
+        require(msg.sender == participantA || msg.sender == participantB, "Unauthorized participant");
+
+        if (msg.sender == participantA) {
+            depositA += msg.value;
+        } else {
+            depositB += msg.value;
+        }
+
+        if (depositA > 0 && depositB > 0) {
+            channelOpen = true;
+            emit ChannelOpened(participantA, participantB);
+        }
+    }
+
+    // Close the channel
+    function closeChannel(uint256 finalBalanceA, uint256 finalBalanceB, bytes memory signatureA, bytes memory signatureB) external {
+        require(channelOpen, "Channel is not open");
+        require(finalBalanceA + finalBalanceB == depositA + depositB, "Balances must match deposits");
+
+        bytes32 message = keccak256(abi.encodePacked(finalBalanceA, finalBalanceB));
+        require(_verifySignature(participantA, message, signatureA), "Invalid signature from A");
+        require(_verifySignature(participantB, message, signatureB), "Invalid signature from B");
+
+        channelOpen = false;
+
+        balances[participantA] = finalBalanceA;
+        balances[participantB] = finalBalanceB;
+
+        emit ChannelClosed(msg.sender, finalBalanceA, finalBalanceB);
+    }
+
+    // Withdraw funds
+    function withdraw() external {
+        uint256 amount = balances[msg.sender];
+        require(amount > 0, "No funds to withdraw");
+
+        balances[msg.sender] = 0;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    // Helper function to verify signatures
+    function _verifySignature(address signer, bytes32 message, bytes memory signature) internal pure returns (bool) {
+        bytes32 ethSignedMessage = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
+        (bytes32 r, bytes32 s, uint8 v) = _splitSignature(signature);
+        return ecrecover(ethSignedMessage, v, r, s) == signer;
+    }
+
+    function _splitSignature(bytes memory sig) internal pure returns (bytes32 r, bytes32 s, uint8 v) {
+        require(sig.length == 65, "Invalid signature length");
+        assembly {
+            r := mload(add(sig, 32))
+            s := mload(add(sig, 64))
+            v := byte(0, mload(add(sig, 96)))
+        }
+    }
+
+    // Receive Ether fallback
+    receive() external payable {}
+}
