@@ -1,0 +1,51 @@
+const express = require('express');
+const { ethers } = require('ethers');
+
+const app = express();
+const port = 4000;
+
+app.use(express.json());
+
+// Participants' private keys (example keys, replace with secure ones)
+const privateKeyA = '0xabc...'; // Replace with actual private key
+const privateKeyB = '0xdef...'; // Replace with actual private key
+
+const walletA = new ethers.Wallet(privateKeyA);
+const walletB = new ethers.Wallet(privateKeyB);
+
+// Off-chain balance tracking
+let offChainBalances = {
+  A: 0,
+  B: 0,
+};
+
+// Sign off-chain transactions
+app.post('/offchain/transfer', async (req, res) => {
+  const { from, to, amount } = req.body;
+
+  if (from !== 'A' && from !== 'B') return res.status(400).json({ error: 'Invalid sender' });
+  if (to !== 'A' && to !== 'B') return res.status(400).json({ error: 'Invalid recipient' });
+  if (offChainBalances[from] < amount) return res.status(400).json({ error: 'Insufficient balance' });
+
+  offChainBalances[from] -= amount;
+  offChainBalances[to] += amount;
+
+  const message = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [offChainBalances.A, offChainBalances.B]);
+  const signature = from === 'A' ? await walletA.signMessage(ethers.utils.arrayify(message)) : await walletB.signMessage(ethers.utils.arrayify(message));
+
+  res.json({
+    message,
+    signature,
+    balances: offChainBalances,
+  });
+});
+
+// Retrieve off-chain balances
+app.get('/offchain/balances', (req, res) => {
+  res.json(offChainBalances);
+});
+
+// Server start
+app.listen(port, () => {
+  console.log(`Off-chain Layer-2 server running at http://localhost:${port}`);
+});
