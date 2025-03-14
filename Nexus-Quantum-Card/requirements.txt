@@ -4,7 +4,7 @@ Flask
 paho-mqtt
 
 # Quantum Computing Libraries
-qiskit==0.39.0                # Main Qiskit library for quantum computing
+qiskit==1.4.2                # Main Qiskit library for quantum computing
 qiskit-aer==0.12.0            # High-performance simulator for quantum circuits
 qiskit-ibm-provider==0.14.0   # Provider for accessing IBM Quantum devices
 qiskit-visualization==0.2.0   # Visualization tools for Qiskit
