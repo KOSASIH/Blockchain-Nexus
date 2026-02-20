@@ -1,7 +1,7 @@
 # Core dependencies
 web3==5.29.0                     # For interacting with Ethereum blockchain
 cryptography==39.0.1              # For cryptographic operations
-Flask==2.2.2                      # For building web applications and APIs
+Flask==3.1.3                      # For building web applications and APIs
 pytest==7.1.2                     # For testing framework
 requests==2.27.1                  # For making HTTP requests
 pandas==1.4.2                     # For data manipulation and analysis
