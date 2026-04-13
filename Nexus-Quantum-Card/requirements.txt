@@ -19,4 +19,4 @@ pandas==1.5.3                  # Data manipulation and analysis
 matplotlib==3.6.2              # Plotting library for visualizations
 
 # Testing Libraries
-pytest==7.2.0                  # Testing framework for Python
+pytest==9.0.3                  # Testing framework for Python
