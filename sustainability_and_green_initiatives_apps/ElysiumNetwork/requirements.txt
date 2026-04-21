@@ -8,4 +8,4 @@ pandas==1.4.2                     # For data manipulation and analysis
 numpy==1.22.3                     # For numerical operations
 sqlalchemy==1.4.36                # For database interactions
 jsonschema==4.4.0                 # For JSON schema validation
-python-dotenv==0.19.2             # For loading environment variables from .env files
+python-dotenv==1.2.2             # For loading environment variables from .env files
